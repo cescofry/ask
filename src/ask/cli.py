@@ -127,8 +127,8 @@ def build_prompt(sections: list[tuple[str, str]], instructions: str) -> str:
 
 def call_claude(prompt: str, model: str, command: str) -> str:
     """Run the configured claude command and return the response text."""
-    cmd = command.split() + ["-p", prompt, "--model", model]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    cmd = command.split() + ["-p", prompt, "--model", model, "--no-session-persistence"]
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd="/tmp")
     if result.returncode != 0:
         err = result.stderr.strip() or result.stdout.strip()
         return f"[Error calling Claude: {err}]"
