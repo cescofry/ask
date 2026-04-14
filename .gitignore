@@ -1,0 +1,17 @@
+# Virtualenv
+.venv/
+
+# Claude Code
+.claude/
+
+# Python build & packaging
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Tools
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
