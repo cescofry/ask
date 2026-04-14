@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(python3:*)",
+      "Bash(.venv/bin/commander:*)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(nvim --version)",
+      "Bash(claude --version)",
+      "Bash(/Users/ffrison/Dev/Ziofritz/Tests/Commander/.venv/bin/pip list:*)",
+      "Bash(nvim --help)",
+      "Bash(.venv/bin/pip install:*)",
+      "Bash(aifx agent:*)"
+    ]
+  }
+}

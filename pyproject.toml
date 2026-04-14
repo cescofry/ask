@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=45"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "commander"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "click",
+    "pyyaml",
+]
+
+[project.scripts]
+commander = "commander.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
