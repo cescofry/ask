@@ -1,4 +1,4 @@
-"""Commander — nvim-based Claude chat interface."""
+"""Ask — nvim-based Claude chat interface."""
 
 from __future__ import annotations
 
@@ -30,13 +30,13 @@ def make_ruler_header(role: str) -> str:
     label = f" {emoji} {name}  {timestamp} "
     return f"{RULER_CHAR * 4}{label}{RULER_CHAR * 20}"
 
-CONFIG_DIR = Path("~/.config/commander").expanduser()
+CONFIG_DIR = Path("~/.config/ask").expanduser()
 CONFIG_FILE = CONFIG_DIR / "config.yml"
 INSTRUCTIONS_FILE = CONFIG_DIR / "instructions.md"
 
 DEFAULT_CONFIG = {
     "model": "haiku",
-    "sessions_dir": "~/commander-sessions",
+    "sessions_dir": "~/ask-sessions",
     "command": "aifx agent run claude",
 }
 
@@ -51,7 +51,7 @@ DEFAULT_INSTRUCTIONS = (
 
 
 def ensure_defaults() -> None:
-    """Create ~/.config/commander/ with defaults if missing."""
+    """Create ~/.config/ask/ with defaults if missing."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
     if not CONFIG_FILE.exists():
@@ -163,7 +163,7 @@ def nvim_set_done(socket_path: str) -> None:
         r"<cmd>e!<cr>"
         r"<cmd>normal! G<cr>"
         r"<cmd>startinsert<cr>"
-        r"<cmd>set statusline=Commander\ [%f]\ %m<cr>",
+        r"<cmd>set statusline=Ask\ [%f]\ %m<cr>",
     )
 
 
@@ -249,12 +249,12 @@ def watch_file(
             try:
                 process_save(session_file, socket_path, model, command, instructions)
             except Exception as exc:
-                print(f"commander: error during processing: {exc}", file=sys.stderr)
+                print(f"ask: error during processing: {exc}", file=sys.stderr)
                 try:
                     nvim_send(
                         socket_path,
                         r"<cmd>setlocal modifiable<cr>"
-                        r"<cmd>set statusline=Commander\ [%f]\ %m<cr>",
+                        r"<cmd>set statusline=Ask\ [%f]\ %m<cr>",
                     )
                 except Exception:
                     pass
@@ -286,17 +286,17 @@ VIM_INIT_CMDS = [
     # No echo in the autocmd — a second message on top of the write confirmation
     # triggers "Press ENTER or type command to continue".
     # The Python mtime watcher handles everything; statusline shows state.
-    r"set statusline=Commander\ [%f]\ %m",
+    r"set statusline=Ask\ [%f]\ %m",
 ]
 
 
 def open_session(session_file: Path, cfg: dict, is_new: bool = False) -> None:
-    """Launch nvim with the Commander autocmd setup and watch for saves."""
+    """Launch nvim with the Ask watcher setup and watch for saves."""
     instructions = INSTRUCTIONS_FILE.read_text()
     model: str = cfg["model"]
     command: str = cfg["command"]
 
-    socket_path = f"/tmp/commander_{os.getpid()}.sock"
+    socket_path = f"/tmp/ask_{os.getpid()}.sock"
 
     nvim_cmd = ["nvim", "--listen", socket_path, str(session_file)]
     for cmd in VIM_INIT_CMDS:
@@ -358,7 +358,7 @@ def pick_history(cfg: dict) -> None:
 @click.group(invoke_without_command=True)
 @click.pass_context
 def main(ctx: click.Context) -> None:
-    """Commander — nvim-based Claude chat interface."""
+    """Ask — nvim-based Claude chat interface."""
     if ctx.invoked_subcommand is None:
         cfg = load_config()
         new_session(cfg)
