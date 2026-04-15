@@ -10,7 +10,8 @@
       "Bash(/Users/ffrison/Dev/Ziofritz/Tests/Commander/.venv/bin/pip list:*)",
       "Bash(nvim --help)",
       "Bash(.venv/bin/pip install:*)",
-      "Bash(aifx agent:*)"
+      "Bash(aifx agent:*)",
+      "Skill(update-config)"
     ]
   }
 }
