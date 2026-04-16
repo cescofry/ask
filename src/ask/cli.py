@@ -287,6 +287,8 @@ VIM_INIT_CMDS = [
     # triggers "Press ENTER or type command to continue".
     # The Python mtime watcher handles everything; statusline shows state.
     r"set statusline=Ask\ [%f]\ %m",
+    "normal! G",
+    "startinsert",
 ]
 
 
@@ -397,8 +399,58 @@ def main(ctx: click.Context) -> None:
         new_session(cfg)
 
 
-@main.command()
-def history() -> None:
+@main.group(invoke_without_command=True)
+@click.pass_context
+def history(ctx: click.Context) -> None:
     """Open a previous session."""
+    if ctx.invoked_subcommand is None:
+        cfg = load_config()
+        pick_history(cfg)
+
+
+def _sessions_without_agent(sessions_dir: Path) -> list[Path]:
+    """Return session files that contain no agent response."""
+    results: list[Path] = []
+    for f in sorted(sessions_dir.glob("*.md"), reverse=True):
+        content = f.read_text()
+        if AGENT_PREFIX not in content:
+            results.append(f)
+    return results
+
+
+@history.command()
+def clean() -> None:
+    """Remove session files that have no agent response."""
     cfg = load_config()
-    pick_history(cfg)
+    sessions_dir = Path(cfg["sessions_dir"]).expanduser()
+    empty = _sessions_without_agent(sessions_dir)
+
+    if not empty:
+        click.echo("No empty sessions found.")
+        return
+
+    initial_list = "\n".join(str(s) for s in empty)
+
+    result = subprocess.run(
+        [
+            "fzf",
+            "--multi",
+            "--preview", "cat {}",
+            "--preview-window", "right:60%:wrap",
+            "--header", "TAB to select · ENTER to delete · ESC to cancel",
+        ],
+        input=initial_list,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0 or not result.stdout.strip():
+        click.echo("Nothing deleted.")
+        return
+
+    selected = [Path(p) for p in result.stdout.strip().splitlines()]
+    for path in selected:
+        path.unlink()
+        click.echo(f"Deleted {path.name}")
+
+    click.echo(f"\nRemoved {len(selected)} session(s).")

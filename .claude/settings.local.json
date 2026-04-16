@@ -11,7 +11,13 @@
       "Bash(nvim --help)",
       "Bash(.venv/bin/pip install:*)",
       "Bash(aifx agent:*)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(git -C /Users/ffrison/Dev/Ziofritz/Tests/Ask log --oneline --all)",
+      "Bash(git -C /Users/ffrison/Dev/Ziofritz/Tests/Ask log -p --all)",
+      "Bash(git -C /Users/ffrison/Dev/Ziofritz/Tests/Ask log --all --format=\"%H %s\")",
+      "Bash(git *)",
+      "Bash(python -c \"from ask.cli import main; main\\(['history', 'clean', '--help']\\)\")",
+      "Bash(python -c \"from ask.cli import main; main\\(['history', '--help']\\)\")"
     ]
   }
 }
