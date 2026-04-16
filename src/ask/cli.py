@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import shlex
 import os
 import subprocess
 import sys
@@ -336,10 +337,43 @@ def pick_history(cfg: dict) -> None:
         click.echo("No sessions found.")
         return
 
-    session_list = "\n".join(str(s) for s in sessions)
+    initial_list = "\n".join(str(s) for s in sessions)
+    sd = shlex.quote(str(sessions_dir))
+
+    reload_cmd = (
+        f'q={{q}}; '
+        f'[ -z "$q" ] && find {sd} -maxdepth 1 -name "*.md" -type f | sort -r || '
+        f'{{ case "$q" in '
+        f'  /*) p="${{q#/}}"; gf="-Ei";; '
+        f'  *) p="$q"; gf="-Fi";; '
+        f'esac; '
+        f'{{ grep -rl $gf --include="*.md" -- "$p" {sd} 2>/dev/null; '
+        f'find {sd} -maxdepth 1 -name "*.md" -type f 2>/dev/null | grep $gf -- "$p"; '
+        f'}} | sort -ur; }}'
+    )
+
+    preview_cmd = (
+        'q={q}; f={}; '
+        'if [ -n "$q" ]; then '
+        '  case "$q" in '
+        '    /*) p="${q#/}"; gf="-Ei";; '
+        '    *) p="$q"; gf="-Fi";; '
+        '  esac; '
+        '  grep --color=always $gf -C 3 -- "$p" "$f" || cat "$f"; '
+        'else '
+        '  cat "$f"; '
+        'fi'
+    )
+
     result = subprocess.run(
-        ["fzf", "--preview", "cat {}"],
-        input=session_list,
+        [
+            "fzf",
+            "--disabled",
+            "--bind", f"change:reload:{reload_cmd}",
+            "--preview", preview_cmd,
+            "--preview-window", "right:60%:wrap",
+        ],
+        input=initial_list,
         capture_output=True,
         text=True,
     )
