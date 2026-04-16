@@ -19,16 +19,15 @@ import yaml
 # ---------------------------------------------------------------------------
 
 RULER_CHAR = "━"
-USER_PREFIX = f"{RULER_CHAR * 4} 👤 User"
-AGENT_PREFIX = f"{RULER_CHAR * 4} 🤖 Agent"
-CLOSING_RULER = RULER_CHAR * 40
+RULER = RULER_CHAR * 28
+USER_PREFIX = "👤 USER"
+AGENT_PREFIX = "🤖 AGENT"
+CLOSING_RULER = RULER
 
 
 def make_ruler_header(role: str) -> str:
-    timestamp = datetime.now().strftime("%H:%M")
-    emoji, name = ("👤", "User") if role == "user" else ("🤖", "Agent")
-    label = f" {emoji} {name}  {timestamp} "
-    return f"{RULER_CHAR * 4}{label}{RULER_CHAR * 20}"
+    label = " 👤 USER" if role == "user" else " 🤖 AGENT"
+    return f"{RULER}\n{label}\n{RULER}"
 
 CONFIG_DIR = Path("~/.config/ask").expanduser()
 CONFIG_FILE = CONFIG_DIR / "config.yml"
