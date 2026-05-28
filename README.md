@@ -1,77 +1,43 @@
 # Ask
 
-A minimal CLI tool that turns **nvim into an interactive Claude chat interface**. Write your message in a vim buffer, save with `:w`, and the response appears automatically — no browser, no GUI, just your editor.
+Ask is a personal AI assistant with two interfaces that share a single configuration:
+
+1. **Ask CLI** -- an nvim-based chat interface (`src/ask/cli.py`)
+2. **Ask Web** -- a native macOS app that opens the opencode web UI in a chromeless window (`ask-webkit/`)
+
+Both read from `~/.config/ask/config.yml`.
 
 ---
 
-## How it works
+## Interfaces
 
-```
-ask
-```
+### Ask CLI
 
-1. A timestamped session file is created in `~/ask-sessions/`.
-2. nvim opens that file with a `👤 User` header ready for input.
-3. You type your message and save (`:w`).
-4. Ask detects the change, locks the buffer, calls Claude, and appends the response under a `🤖 Agent` header.
-5. The buffer reloads, cursor lands at the new `👤 User` section, insert mode is active.
-6. Repeat.
-
----
-
-## Buffer format
-
-Every session is a plain `.md` file. Turns are delimited by timestamp rulers:
-
-```
-━━━━ 👤 User  14:32 ━━━━━━━━━━━━━━━━━━━━
-
-Your message here.
-
-━━━━ 🤖 Agent  14:32 ━━━━━━━━━━━━━━━━━━━━
-
-Claude's response here.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-━━━━ 👤 User  14:33 ━━━━━━━━━━━━━━━━━━━━
-
-Your follow-up here.
-```
-
-- `━━━━ 👤 User  HH:MM ━━━━━━━━━━━━━━━━━━━━` — opens a user turn
-- `━━━━ 🤖 Agent  HH:MM ━━━━━━━━━━━━━━━━━━━━` — opens an agent turn
-- `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━` — closes an agent turn (40 `━` chars)
-
-The parser uses `startswith` on the prefix (`━━━━ 👤 User` / `━━━━ 🤖 Agent`), so the timestamp is ignored during parsing. A line of pure `━` characters is treated as a closing ruler and skipped. Session files are valid Markdown.
-
----
-
-## Commands
+A terminal tool that turns nvim into an interactive AI chat. Write your message in a vim buffer, save with `:w`, and the response appears automatically.
 
 ```bash
-ask            # open a new session
-ask history    # pick a previous session with fzf
+ask            # new session
+ask history    # resume a previous session via fzf
 ```
 
-`history` uses `fzf` with a `cat` preview. Selecting a session opens it in nvim with the full watcher active, so the conversation can continue from where it left off.
+Sessions are stored as `.md` files in `~/ask-sessions/`. The CLI calls `opencode run` to get responses, sending the full conversation history each turn.
 
----
-
-## Installation
-
-Requires Python 3.10+, nvim, and fzf.
+Requires: Python 3.10+, nvim, fzf.
 
 ```bash
-# inside the project directory
-python3 -m venv .venv
-.venv/bin/pip install -e .
+cd src && python3 -m venv .venv && .venv/bin/pip install -e .
 ```
 
-The entry point `.venv/bin/ask` is ready to use. Add it to your PATH or alias it:
+### Ask Web
+
+A native macOS app that opens the opencode web UI in a chromeless window via a global keyboard shortcut. Built with Swift, AppKit, and WKWebView -- no Electron, no bundled Chromium.
+
+Press `Ctrl+Shift+A` from anywhere in macOS to open or toggle the window.
+
+Requires: Swift 5.9+ (Xcode 15+), opencode.
 
 ```bash
-alias ask='/path/to/.venv/bin/ask'
+cd ask-webkit && swift build && swift run Ask
 ```
 
 ---
@@ -81,51 +47,169 @@ alias ask='/path/to/.venv/bin/ask'
 Auto-created on first run at `~/.config/ask/config.yml`:
 
 ```yaml
-model: haiku
+model: google/gemini-3.5-flash
 sessions_dir: ~/ask-sessions
-command: aifx agent run claude
+command: opencode run
+shortcut: ctrl+shift+a
+
+web:
+  working_dir: ~/Documents/ASK
+  port: 40973
+  # password: mysecret  # uncomment to protect the web UI
 ```
 
-| Key | Description |
-|---|---|
-| `model` | Model alias or full ID passed to `--model`. Accepts short aliases (`haiku`, `sonnet`, `opus`) or full names (`claude-sonnet-4-6`). |
-| `sessions_dir` | Where session `.md` files are saved. Supports `~` expansion. |
-| `command` | Shell command used to invoke Claude, split on spaces and called directly (no shell). Required because `claude` is typically a shell alias rather than a binary. |
+### Config keys
+
+| Key | Used by | Description |
+|---|---|---|
+| `model` | CLI + Web | Model ID in `provider/model` format (e.g. `google/gemini-3.5-flash`). CLI passes it to `--model`. Web writes it to `opencode.json` in the working directory. |
+| `sessions_dir` | CLI | Directory where session `.md` files are saved. Supports `~`. |
+| `command` | CLI | Shell command for the model backend (e.g. `opencode run`). |
+| `shortcut` | Web | System-wide keyboard shortcut. Format: modifiers joined with `+`. |
+| `web.working_dir` | Web | Project directory where `opencode serve` runs. Supports `~`. |
+| `web.port` | Web | Local port for the opencode web server (1024--65535). |
+| `web.password` | Web | Password to protect the web UI via `OPENCODE_SERVER_PASSWORD`. Leave empty or omit to disable. |
+
+### Shortcut format
+
+Modifiers: `ctrl`, `shift`, `alt` / `option`, `cmd` / `command`.
+Keys: `a`--`z`, `0`--`9`, `space`, `return`, `escape`.
+
+Examples: `ctrl+shift+a`, `cmd+shift+o`, `alt+shift+1`.
 
 ### System instructions
 
-`~/.config/ask/instructions.md` is prepended to every prompt as a system block. Default:
+`~/.config/ask/instructions.md` is prepended to every CLI prompt as a system block. Default:
 
 ```
 Be concise and direct. Avoid preamble or verbose explanations. Get to the point.
 ```
 
-Edit this file to change Claude's default behaviour across all sessions.
+This file is only used by the CLI. The web interface uses opencode's own system instructions.
 
 ---
 
-## Architecture
+## Ask Web -- detailed behavior
 
-### Project layout
+### Startup
+
+1. App launches as a regular macOS app (visible in Dock and Cmd+Tab).
+2. Reads `~/.config/ask/config.yml`.
+3. Validates that `web.working_dir` exists and is a directory.
+4. Registers the global shortcut via Carbon `RegisterEventHotKey`.
+5. Waits for shortcut press.
+
+### On shortcut press
+
+1. Config is re-read from disk (edits take effect without restarting).
+2. Checks whether a server is already responding on `127.0.0.1:{port}` via HTTP HEAD.
+3. If no server is running:
+   - Writes/updates `opencode.json` in the working directory with the configured `model` (because `opencode serve` does not accept `--model`).
+   - Spawns `opencode serve --hostname 127.0.0.1 --port {port}` with cwd set to `web.working_dir`.
+   - Polls until the server responds (up to 10 seconds).
+4. Opens or focuses a chromeless WKWebView window.
+5. Loads `http://127.0.0.1:{port}/{base64url(working_dir)}/session` so the web UI opens directly on the configured project.
+
+If the window is already visible, the shortcut hides it (toggle behavior).
+
+### Project URL encoding
+
+The opencode web SPA uses URL-safe base64 encoding of the directory path as a route slug. For example:
 
 ```
-src/
-  ask/
-    __init__.py      # empty
-    cli.py           # all logic
-pyproject.toml
-README.md
+/Users/ffrison/Documents/ASK
 ```
 
-Single-file implementation — everything lives in `cli.py`.
+becomes:
+
+```
+http://127.0.0.1:40973/L1VzZXJzL2Zmcmlzb24vRG9jdW1lbnRzL0FTSw/session
+```
+
+This is handled automatically by `OpencodeServer.projectURL`.
+
+### Window behavior
+
+- Chromeless: transparent titlebar, hidden title, content fills the full frame.
+- `Esc` hides the window.
+- Close button hides the window (does not destroy it).
+- Window size and position are persisted via `NSWindow.setFrameAutosaveName`.
+- Initial size: 80% screen width, 85% screen height, centered.
+
+### Server lifecycle
+
+- If the app starts the server, it owns the process and terminates it on app quit.
+- If a server was already running on the port (started externally), the app reuses it and does not terminate it on quit.
+- The opencode binary is resolved by checking, in order:
+  1. `~/.opencode/bin/opencode`
+  2. `/usr/local/bin/opencode`
+  3. `/opt/homebrew/bin/opencode`
+  4. Fallback: `/usr/bin/env opencode` (PATH lookup)
+
+### Permissions
+
+The global hotkey requires Accessibility permission on modern macOS.
+
+**System Settings > Privacy & Security > Accessibility**
+
+Add the `Ask` binary, or Terminal/iTerm if running via `swift run`.
+
+---
+
+## Project layout
+
+```
+.
+├── README.md                          # this file
+├── pyproject.toml                     # Python package definition (CLI)
+├── fzf-browse.sh                      # standalone fzf file browser
+├── src/
+│   └── ask/
+│       ├── __init__.py
+│       └── cli.py                     # CLI: all logic in one file
+└── ask-webkit/
+    ├── Package.swift                  # Swift Package Manager manifest
+    ├── README.md                      # Web app quick-start guide
+    └── Sources/
+        └── Ask/
+            ├── main.swift             # App entry point, NSApplication setup
+            ├── Config.swift           # YAML config loader, shortcut parser
+            ├── HotKey.swift           # Carbon global hotkey registration
+            ├── OpencodeServer.swift   # Server health check and process lifecycle
+            └── WebWindow.swift        # Chromeless NSWindow + WKWebView
+```
+
+### Source files (Ask Web)
+
+| File | Responsibility |
+|---|---|
+| `main.swift` | Creates `NSApplication` as a regular app (`.regular` activation policy), validates config, registers the global shortcut, handles shortcut events by ensuring the server is up and showing/hiding the window. |
+| `Config.swift` | Reads `~/.config/ask/config.yml` using Yams. Creates the file with defaults if missing. Parses shortcut strings into Carbon modifier masks and virtual key codes. |
+| `HotKey.swift` | Registers/unregisters a system-wide hotkey using Carbon `RegisterEventHotKey` and `InstallEventHandler`. Dispatches the callback to the main thread. |
+| `OpencodeServer.swift` | Manages the opencode server process. Health-checks via HTTP HEAD. Starts `opencode serve` as a child process. Writes `opencode.json` to set the model. Provides `baseURL` and `projectURL`. Terminates owned processes on shutdown. |
+| `WebWindow.swift` | Creates a chromeless `NSWindow` with `WKWebView`. Handles show/hide/toggle/focus. Monitors `Esc` to hide. Persists window frame. |
+
+### Dependencies
+
+**CLI (Python):**
+- `click` -- command-line interface
+- `pyyaml` -- YAML config parsing
+
+**Web (Swift):**
+- `Yams` -- YAML config parsing (only external dependency)
+- AppKit, WebKit, Carbon -- macOS system frameworks
+
+---
+
+## Ask CLI -- detailed behavior
 
 ### Change detection
 
-Ask does **not** use mtime polling. Instead it MD5-hashes the session file every 0.2 s and compares against a cached hash:
+The CLI does not use mtime polling. It MD5-hashes the session file every 0.2s and compares against a cached hash:
 
-- After Python writes the response, `state["hash"]` is updated immediately in a `finally` block — so the watcher sees no change on the next poll and does not re-trigger.
-- A `:w` with no content changes produces the same hash → no trigger. This is impossible to guarantee with mtime alone.
-- A crash mid-write still runs `update_hash()` via `finally`, so the watcher never gets stuck seeing a stale hash.
+- After writing a response, `state["hash"]` is updated in a `finally` block so the watcher does not re-trigger.
+- Saving with no content changes produces the same hash and is ignored.
+- A crash mid-write still runs `update_hash()` via `finally`.
 
 ### Threading model
 
@@ -139,68 +223,64 @@ stop_event.set()         update state["hash"]      process_save()
                                                    loop back to wait
 ```
 
-Key properties:
-
-- **One consumer thread** — saves are processed serially; no parallel Claude calls.
-- `save_event` (`threading.Event`) is the signal. Setting it is idempotent — if a save arrives while Claude is running, the flag is already raised and the consumer picks it up on the next iteration.
-- `hash_lock` (`threading.Lock`) protects `state["hash"]` against concurrent reads/writes between the watcher loop and `update_hash()`.
+- One consumer thread processes saves serially.
+- `save_event` (threading.Event) is the signal; idempotent.
+- `hash_lock` (threading.Lock) protects `state["hash"]`.
 
 ### nvim communication
 
-Ask controls nvim via its msgpack-RPC socket:
+nvim is started with a msgpack-RPC socket (`--listen /tmp/ask_{pid}.sock`). The CLI sends keystrokes via `nvim --server ... --remote-send` to lock/unlock the buffer and update the statusline.
 
-```bash
-# nvim started with a socket
-nvim --listen /tmp/ask_<pid>.sock session.md
+### Multi-turn prompts
 
-# Python sends keystrokes
-nvim --server /tmp/ask_<pid>.sock --remote-send "<cmd>setlocal nomodifiable<cr>"
-```
-
-**While processing** — buffer locked, statusline updated:
-```
-<Esc><cmd>setlocal nomodifiable<cr><cmd>set statusline=🤖 Processing...<cr>
-```
-
-**After response written** — buffer unlocked, file reloaded, cursor at end in insert mode:
-```
-<cmd>setlocal modifiable<cr><cmd>e!<cr><cmd>normal! G<cr><cmd>startinsert<cr><cmd>set statusline=Ask [%f] %m<cr>
-```
-
-The statusline is used for the loading indicator rather than `echo` because nvim's own write confirmation (`"file" NL, NNB written`) is already in the command area — a second `echo` on top of it triggers "Press ENTER or type command to continue", which blocks input.
-
-### Multi-turn prompt construction
-
-The entire conversation history is sent on every turn as a single prompt to `claude -p`. Format:
-
-```
-<system>
-{contents of ~/.config/ask/instructions.md}
-</system>Human: first user message
-Assistant: first agent response
-
-Human: follow-up message
-```
-
-This is a stateless pattern — `claude -p` has no memory between calls. All context must be re-sent each turn. For very long sessions this grows the prompt, but for typical chat sessions it is negligible.
+The full conversation history is sent on every turn as a single prompt to `opencode run`. This is stateless -- opencode has no memory between calls.
 
 ---
 
 ## Known limitations
 
-- **No streaming** — Claude is called synchronously. The buffer is locked until the full response arrives.
-- **Single session at a time** — each `ask` process owns one nvim instance and one socket.
-- **No attachment support** — text-only sessions.
-- **Prompt grows with history** — all turns are resent each time; very long conversations will hit model context limits.
+- **CLI: no streaming** -- the buffer is locked until the full response arrives.
+- **CLI: single session** -- each `ask` process owns one nvim instance.
+- **CLI: text only** -- no file attachments.
+- **CLI: prompt grows** -- all turns are resent; long conversations hit context limits.
+- **Web: macOS only** -- uses AppKit, WKWebView, and Carbon APIs.
+- **Web: no dock icon** -- the app runs as a background process; quit via Activity Monitor or `kill`.
 
 ---
 
-## Potential future work
+## Autostart at login (Ask Web)
 
-- **Streaming responses** — write tokens to the file incrementally as Claude generates them, using `--output-format stream-json`.
-- **Session titles** — auto-generate a short title from the first user message and display it in the fzf history picker.
-- **Named sessions** — `ask --name "my-session"` to open or resume a named session instead of a timestamp.
-- **Multiple models per session** — allow switching model mid-conversation via a buffer command (e.g. `:Ask model sonnet`).
-- **Syntax highlighting** — a vim ftplugin that highlights `━━━━ 👤 User` / `━━━━ 🤖 Agent` rulers in distinct colours.
-- **pynvim integration** — replace `nvim --remote-send` subprocess calls with the `pynvim` library for more reliable bidirectional RPC.
-- **Interrupt in-flight request** — allow `<C-c>` in nvim to cancel a running Claude call.
+Create a LaunchAgent:
+
+```bash
+mkdir -p ~/Library/LaunchAgents
+
+cat > ~/Library/LaunchAgents/com.ask.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ask</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/path/to/ask-webkit/.build/release/Ask</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>
+EOF
+
+launchctl load ~/Library/LaunchAgents/com.ask.plist
+```
+
+For a release build:
+
+```bash
+cd ask-webkit
+swift build -c release
+# binary at: .build/release/Ask
+```

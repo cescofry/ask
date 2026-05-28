@@ -1,4 +1,4 @@
-"""Ask — nvim-based Claude chat interface."""
+"""Ask — nvim-based AI chat interface."""
 
 from __future__ import annotations
 
@@ -35,9 +35,14 @@ CONFIG_FILE = CONFIG_DIR / "config.yml"
 INSTRUCTIONS_FILE = CONFIG_DIR / "instructions.md"
 
 DEFAULT_CONFIG = {
-    "model": "haiku",
+    "model": "google/gemini-3.5-flash",
     "sessions_dir": "~/ask-sessions",
-    "command": "aifx agent run claude",
+    "command": "opencode run",
+    "shortcut": "ctrl+shift+a",
+    "web": {
+        "working_dir": "~/Documents/ASK",
+        "port": 40973,
+    },
 }
 
 DEFAULT_INSTRUCTIONS = (
@@ -106,32 +111,32 @@ def parse_buffer(content: str) -> list[tuple[str, str]]:
 
 
 def build_prompt(sections: list[tuple[str, str]], instructions: str) -> str:
-    """Build a full-history prompt to pass to claude -p."""
+    """Build a full-history prompt to pass to the model backend."""
     parts: list[str] = []
     if instructions.strip():
-        parts.append(f"<system>\n{instructions.strip()}\n</system>")
+        parts.append(f"System: {instructions.strip()}")
 
     for role, text in sections:
         if not text:
             continue
-        prefix = "Human" if role == "user" else "Assistant"
+        prefix = "User" if role == "user" else "Assistant"
         parts.append(f"{prefix}: {text}")
 
     return "\n\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
-# Claude invocation
+# Model invocation
 # ---------------------------------------------------------------------------
 
 
-def call_claude(prompt: str, model: str, command: str) -> str:
-    """Run the configured claude command and return the response text."""
-    cmd = command.split() + ["-p", prompt, "--model", model, "--no-session-persistence"]
+def call_backend(prompt: str, model: str, command: str) -> str:
+    """Run the configured command and return the response text."""
+    cmd = command.split() + ["--model", model, prompt]
     result = subprocess.run(cmd, capture_output=True, text=True, cwd="/tmp")
     if result.returncode != 0:
         err = result.stderr.strip() or result.stdout.strip()
-        return f"[Error calling Claude: {err}]"
+        return f"[Error calling model: {err}]"
     return result.stdout.strip()
 
 
@@ -179,7 +184,7 @@ def process_save(
     command: str,
     instructions: str,
 ) -> None:
-    """Read the current file, call Claude if there is a pending user message, append response."""
+    """Read the current file, call the model if there is a pending user message, append response."""
     content = session_file.read_text()
     sections = parse_buffer(content)
 
@@ -190,7 +195,7 @@ def process_save(
     nvim_set_loading(socket_path)
 
     prompt = build_prompt(sections, instructions)
-    response = call_claude(prompt, model, command)
+    response = call_backend(prompt, model, command)
 
     new_content = (
         content.rstrip()
@@ -393,7 +398,7 @@ def pick_history(cfg: dict) -> None:
 @click.group(invoke_without_command=True)
 @click.pass_context
 def main(ctx: click.Context) -> None:
-    """Ask — nvim-based Claude chat interface."""
+    """Ask — nvim-based AI chat interface."""
     if ctx.invoked_subcommand is None:
         cfg = load_config()
         new_session(cfg)
