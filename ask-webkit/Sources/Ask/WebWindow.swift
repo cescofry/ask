@@ -42,22 +42,27 @@ class WebWindow: NSObject, NSWindowDelegate {
         // giving a borderless look while keeping standard window controls.
         let w = NSWindow(
             contentRect: frame,
-            styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
-        w.titlebarAppearsTransparent = true
+        w.titlebarAppearsTransparent = false
         w.titleVisibility = .hidden
         w.isMovableByWindowBackground = true
-        w.backgroundColor = NSColor(white: 0.08, alpha: 1.0)
         w.minSize = NSSize(width: 400, height: 300)
         w.delegate = self
 
         // Restore saved frame or use default
         w.setFrameAutosaveName("AskMainWindow")
 
-        wv.frame = w.contentView!.bounds
+        wv.translatesAutoresizingMaskIntoConstraints = false
         w.contentView?.addSubview(wv)
+        NSLayoutConstraint.activate([
+            wv.topAnchor.constraint(equalTo: w.contentView!.topAnchor),
+            wv.leadingAnchor.constraint(equalTo: w.contentView!.leadingAnchor),
+            wv.trailingAnchor.constraint(equalTo: w.contentView!.trailingAnchor),
+            wv.bottomAnchor.constraint(equalTo: w.contentView!.bottomAnchor),
+        ])
 
         // Load the opencode web UI
         wv.load(URLRequest(url: url))
